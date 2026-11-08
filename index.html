@@ -1,0 +1,165 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>Inside the Machine That Creates You</title>
+<style>
+:root{color-scheme:dark;--bg:#05060d;--fg:#e8ecff;--mut:#9aa3c7;--ac:#7cf5ff;--ac2:#ff6bd6;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+*{box-sizing:border-box}html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,Segoe UI,sans-serif;overflow:hidden}
+canvas#c{position:fixed;inset:0;width:100%;height:100%;display:block}
+nav{position:fixed;top:env(safe-area-inset-top,0px);left:0;right:0;display:flex;gap:8px;align-items:center;padding:10px 14px;z-index:15;flex-wrap:wrap}
+nav b{margin-right:auto;font-size:14px;letter-spacing:.08em;text-transform:uppercase;color:var(--ac)}
+button{background:rgba(20,26,52,.75);color:var(--fg);border:1px solid rgba(124,245,255,.35);border-radius:999px;padding:8px 14px;font:inherit;font-size:14px;cursor:pointer;backdrop-filter:blur(6px)}
+button:hover{border-color:var(--ac)}button.on{background:var(--ac);color:#021;border-color:var(--ac)}
+#cap{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(14px + env(safe-area-inset-bottom,0px));width:min(720px,94vw);background:linear-gradient(180deg,rgba(8,10,24,.55),rgba(8,10,24,.88));border:1px solid rgba(124,245,255,.2);border-radius:16px;padding:16px 18px;z-index:4;backdrop-filter:blur(8px)}
+#cap h2{margin:0 0 6px;font-size:clamp(18px,3.4vw,26px);font-weight:600}#cap p{margin:4px 0;color:var(--mut);line-height:1.5;font-size:15px}
+#cs{color:var(--ac2)!important;font-weight:600;min-height:1.4em}
+.ctl{display:flex;gap:8px;align-items:center;margin-top:10px}.dots{display:flex;gap:6px;margin-left:auto}.dots i{width:9px;height:9px;border-radius:50%;background:#2a3158;cursor:pointer}.dots i.a{background:var(--ac)}
+#start{position:fixed;inset:0;z-index:20;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;background:radial-gradient(circle,#0b1030,#02030a);padding:24px}
+#start h1{font-size:clamp(28px,6vw,56px);margin:0 0 10px;font-weight:300;letter-spacing:.02em}#start h1 span{color:var(--ac);font-weight:700}#start p{color:var(--mut);max-width:520px}
+#start button{font-size:18px;padding:14px 32px;margin-top:18px;background:var(--ac);color:#021}
+#g{position:fixed;inset:0;z-index:10;background:rgba(3,4,12,.9);display:none;overflow:auto;padding:70px 14px 24px}
+#g.show{display:block}.gw{max-width:700px;margin:0 auto}
+.tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+#ga canvas{width:100%;background:#070a1c;border:1px solid rgba(124,245,255,.25);border-radius:12px;touch-action:none;display:block}
+.hint{color:var(--mut);font-size:14px}.hud{display:flex;justify-content:space-between;font-weight:600;margin:6px 0}
+.opt{display:block;width:100%;text-align:left;margin:8px 0;border-radius:12px;padding:12px 14px}.opt.ok{background:#1faa6a;color:#fff}.opt.no{background:#b0305a;color:#fff}
+.bar{height:6px;background:#1a2040;border-radius:3px;overflow:hidden}.bar i{display:block;height:100%;background:var(--ac)}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}.card{aspect-ratio:1.2;border-radius:12px;font-size:clamp(11px,2.6vw,15px);padding:4px;border:1px solid rgba(124,245,255,.3)}.card.m{background:#1faa6a;color:#fff}
+h3{margin:4px 0 8px;font-size:20px}
+</style></head><body>
+<canvas id="c"></canvas>
+<nav><b>Mastix Ed · Inside the Machine</b><button id="bC" class="on">Cinematic</button><button id="bG">Games</button><button id="bS">Sound: on</button></nav>
+<div id="cap"><h2 id="ct"></h2><p id="cx"></p><p id="cs"></p><div class="ctl"><button id="pv">◀</button><button id="pp">❚❚</button><button id="nx">▶</button><div class="dots" id="dots"></div></div></div>
+<div id="start"><h1>Inside the Machine<br>That Creates <span>You</span></h1><p>A cinematic 3D journey through 86 billion neurons: from the lobes of the brain down to a single synapse. Followed by four games to test what you learn. Best with sound on.</p><button id="go">Begin the journey</button></div>
+<div id="g"><div class="gw"><div class="tabs"><button id="bk">← Back to journey</button><button data-g="quiz">Lobe Blitz</button><button data-g="relay">Signal Relay</button><button data-g="catch">Synapse Catcher</button><button data-g="mem">Memory Match</button></div><div id="ga"></div></div></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const $=id=>document.getElementById(id),rnd=(a,b)=>a+Math.random()*(b-a),shuf=a=>a.map(v=>[Math.random(),v]).sort((x,y)=>x[0]-y[0]).map(v=>v[1]);
+let snd=true,AC,mg,o1,o2;
+function audio(){if(AC)return;AC=new(window.AudioContext||window.webkitAudioContext)();mg=AC.createGain();mg.gain.value=.1;const f=AC.createBiquadFilter();f.type='lowpass';f.frequency.value=500;o1=AC.createOscillator();o2=AC.createOscillator();o1.type='sawtooth';o2.type='triangle';[o1,o2].forEach(o=>{o.connect(f);o.start()});f.connect(mg);mg.connect(AC.destination);const l=AC.createOscillator(),lg=AC.createGain();l.frequency.value=.13;lg.gain.value=220;l.connect(lg);lg.connect(f.frequency);l.start();setF(55)}
+function setF(h){if(AC){o1.frequency.setTargetAtTime(h,AC.currentTime,1.5);o2.frequency.setTargetAtTime(h*1.5,AC.currentTime,1.5)}}
+function blip(fr=880,v=.12,d=.15){if(!AC||!snd)return;const o=AC.createOscillator(),g=AC.createGain(),t=AC.currentTime;o.frequency.setValueAtTime(fr,t);o.frequency.exponentialRampToValueAtTime(fr*.5,t+d);g.gain.setValueAtTime(v,t);g.gain.exponentialRampToValueAtTime(.001,t+d);o.connect(g);g.connect(AC.destination);o.start();o.stop(t+d)}
+function say(t){try{speechSynthesis.cancel();if(!snd)return;const u=new SpeechSynthesisUtterance(t);u.rate=.95;u.pitch=.9;speechSynthesis.speak(u)}catch(e){}}
+
+/* ---------- 3D world ---------- */
+const R=new THREE.WebGLRenderer({canvas:$('c'),antialias:true});R.setPixelRatio(Math.min(devicePixelRatio,2));R.setClearColor(0x05060d);
+const S=new THREE.Scene();S.fog=new THREE.FogExp2(0x05060d,.007);
+const cam=new THREE.PerspectiveCamera(55,1,.1,700);S.add(cam);
+const cl=new THREE.PointLight(0xcfe8ff,1.4,90);cam.add(cl);S.add(new THREE.AmbientLight(0x6070ff,.55));
+function rs(){R.setSize(innerWidth,innerHeight);cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix()}addEventListener('resize',rs);rs();
+{const n=1500,p=new Float32Array(n*3);for(let i=0;i<n;i++){const v=new THREE.Vector3(rnd(-1,1),rnd(-1,1),rnd(-1,1)).normalize().multiplyScalar(rnd(150,400));p.set([v.x,v.y,v.z],i*3)}const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(p,3));S.add(new THREE.Points(g,new THREE.PointsMaterial({size:1.1,color:0x8899cc,fog:false})))}
+// Brain (point cloud coloured by lobe)
+const B=new THREE.Group();S.add(B);const N=7000,P=new Float32Array(N*3),C=new Float32Array(N*3),L=new Uint8Array(N);
+const LC=[[1,.45,.35],[.4,.8,1],[.75,.5,1],[.4,1,.6]],LN=['Frontal lobe: plans, decides, controls','Parietal lobe: senses touch and space','Occipital lobe: sees','Temporal lobe: hears, remembers language'];
+for(let i=0;i<N;i++){const u=rnd(-1,1),t=rnd(0,6.283),s=Math.sqrt(1-u*u),dx=s*Math.cos(t),dy=u,dz=s*Math.sin(t);let r=1+.07*Math.sin(dx*9+1)*Math.sin(dy*8)*Math.sin(dz*9);if(Math.abs(dx)<.06&&dy>0)r-=.09;P.set([dx*r*9,dy*r*7,dz*r*12],i*3);L[i]=dy<-.2&&Math.abs(dz)<.65?3:dz>.25?0:dz<-.55?2:1}
+const bg=new THREE.BufferGeometry();bg.setAttribute('position',new THREE.BufferAttribute(P,3));bg.setAttribute('color',new THREE.BufferAttribute(C,3));
+const bm=new THREE.PointsMaterial({size:.22,vertexColors:true,transparent:true,opacity:.95,blending:THREE.AdditiveBlending,depthWrite:false});B.add(new THREE.Points(bg,bm));
+function cols(a){for(let i=0;i<N;i++){const k=a<0?.9:L[i]==a?1.7:.22,c=LC[L[i]];C.set([c[0]*k,c[1]*k,c[2]*k],i*3)}bg.attributes.color.needsUpdate=true}cols(-1);
+// Hippocampus + amygdala
+const IN=new THREE.Group();B.add(IN);const amy=[];
+[-1,1].forEach(s=>{const cv=new THREE.CatmullRomCurve3([[3.5,-1.5,-5],[5,-1,-2],[5.6,-.5,1.5],[4.8,-1.2,4.5],[3.8,-2.4,6.5]].map(a=>new THREE.Vector3(a[0]*s,a[1],a[2])));IN.add(new THREE.Mesh(new THREE.TubeGeometry(cv,40,.6,10),new THREE.MeshPhongMaterial({color:0xffb347,emissive:0x663300})));const a=new THREE.Mesh(new THREE.SphereGeometry(.95,20,16),new THREE.MeshPhongMaterial({color:0xff3355,emissive:0x660018}));a.position.set(s*4.2,-2.6,7.4);IN.add(a);amy.push(a)});
+IN.scale.setScalar(.001);
+// Chemical messengers
+const CN=380,cp=new Float32Array(CN*3),cc=new Float32Array(CN*3),cv=[],CCOL=[[1,.8,.2],[.3,.9,1],[.7,.5,1],[.5,1,.5],[1,.25,.25],[1,.4,.8],[.35,.5,1],[1,.6,.2]];
+for(let i=0;i<CN;i++){cp.set([rnd(-6,6),rnd(-4,4),rnd(-8,8)],i*3);cc.set(CCOL[i%8],i*3);cv.push(new THREE.Vector3(rnd(-1,1),rnd(-1,1),rnd(-1,1)))}
+const cg=new THREE.BufferGeometry();cg.setAttribute('position',new THREE.BufferAttribute(cp,3));cg.setAttribute('color',new THREE.BufferAttribute(cc,3));
+const cm=new THREE.PointsMaterial({size:.5,vertexColors:true,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false});B.add(new THREE.Points(cg,cm));
+// Neuron
+const NG=new THREE.Group();NG.position.y=-60;S.add(NG);
+const soma=new THREE.Mesh(new THREE.IcosahedronGeometry(3,1),new THREE.MeshPhongMaterial({color:0x5a9bff,emissive:0x112a66,flatShading:true}));NG.add(soma);
+const dm=new THREE.MeshPhongMaterial({color:0x88bbff,emissive:0x0a1a44});
+for(let i=0;i<11;i++){const d=new THREE.Vector3(-rnd(.3,1),rnd(-1,1),rnd(-1,1)).normalize();const pts=[d.clone().multiplyScalar(2.5),d.clone().multiplyScalar(6).add(new THREE.Vector3(rnd(-1,1),rnd(-1,1),rnd(-1,1))),d.clone().multiplyScalar(11).add(new THREE.Vector3(rnd(-2,2),rnd(-2,2),rnd(-2,2)))];NG.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts),20,.2,6),dm))}
+const ax=new THREE.Mesh(new THREE.CylinderGeometry(.35,.35,56,12),new THREE.MeshPhongMaterial({color:0xfff2a0,emissive:0x554400}));ax.rotation.z=Math.PI/2;ax.position.x=31;NG.add(ax);
+const mm=new THREE.MeshPhongMaterial({color:0xff9ec7,emissive:0x331122,transparent:true,opacity:.88}),nodes=[3];
+for(let i=0;i<7;i++){const m=new THREE.Mesh(new THREE.CylinderGeometry(1.1,1.1,5.5,24),mm);m.rotation.z=Math.PI/2;m.position.x=9.75+i*7;NG.add(m);nodes.push(13.5+i*7+.0)}
+nodes[7]=nodes[7];const END=58;
+const bulb=new THREE.Mesh(new THREE.SphereGeometry(2.2,20,16),new THREE.MeshPhongMaterial({color:0xffd27a,emissive:0x553300}));bulb.position.x=END;NG.add(bulb);
+const post=new THREE.Mesh(new THREE.SphereGeometry(6,32,24),new THREE.MeshPhongMaterial({color:0x2ac9b5,emissive:0x053a36,transparent:true,opacity:.55}));post.position.x=69.7;NG.add(post);
+for(let i=0;i<12;i++){const a=rnd(-.9,.9),b=rnd(-.9,.9),r=new THREE.Mesh(new THREE.SphereGeometry(.28,8,8),new THREE.MeshBasicMaterial({color:0xff6bd6}));r.position.set(69.7-6*Math.cos(a)*Math.cos(b),6*Math.sin(a),6*Math.cos(a)*Math.sin(b));NG.add(r)}
+const pulse=new THREE.Mesh(new THREE.SphereGeometry(.85,16,12),new THREE.MeshBasicMaterial({color:0xffffff}));const pl=new THREE.PointLight(0x7cf5ff,2.5,14);pulse.add(pl);NG.add(pulse);pulse.visible=false;
+const VN=100,vp=new Float32Array(VN*3),vph=[],vg=new THREE.BufferGeometry();for(let i=0;i<VN;i++)vph.push([Math.random(),rnd(-1,1),rnd(-1,1)]);vg.setAttribute('position',new THREE.BufferAttribute(vp,3));
+const vm=new THREE.PointsMaterial({size:.45,color:0xffd27a,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false});NG.add(new THREE.Points(vg,vm));
+
+/* ---------- chapters ---------- */
+const CH=[
+{t:'Three pounds of living tissue',x:'The most complex structure we know. Inside your skull, 86 billion neurons are running this very thought.',n:'Three pounds of living tissue. The most complex structure we know.',p:[0,4,30],l:[0,0,0],f:55},
+{t:'The outer lobes',x:'Four great territories cover the surface. Each lights up in turn.',n:'The outer lobes plan, sense, see, and remember.',p:[-24,9,18],l:[0,0,0],f:62,lobes:1},
+{t:'Deep inside: memory and fear',x:'The hippocampus (gold) builds your memories. The amygdala (red) feels fear and tags what matters.',n:'Deep inside, the hippocampus builds your memories, and the amygdala feels fear.',p:[0,5,20],l:[0,-1,3],f:49,op:.1},
+{t:'Chemical messengers',x:'Chemical messengers drift between cells and shape who you are: dopamine (reward), serotonin (mood), glutamate (excites), GABA (calms), cortisol (stress), oxytocin (bonding), melatonin (sleep) and endorphin (pain relief).',s:'Gold dopamine · Cyan serotonin · Violet glutamate · Green GABA · Red cortisol · Pink oxytocin · Indigo melatonin · Orange endorphin',n:'Chemical messengers shape who you are.',p:[0,0,24],l:[0,0,0],f:73,op:.25,chem:1},
+{t:'A single neuron fires',x:'Zoom in. A neuron collects signals on its dendrites, and when the threshold is crossed, an electrical spike races down the axon.',n:'Now we zoom down to a single neuron firing.',p:[-6,-53,24],l:[10,-60,0],f:82,pulse:1,y:-60},
+{t:'Myelin: the express lane',x:'Fatty myelin wraps the axon, so the signal leaps from gap to gap at up to 100 metres per second.',n:'The myelin sheath lets signals race at one hundred metres per second.',p:[26,-53,14],l:[28,-60,0],f:92,pulse:2,y:-60},
+{t:'The 20-nanometre gap',x:'At the synapse, electricity becomes chemistry. Vesicles spill neurotransmitters across the gap to receptors on the next cell.',n:'At the twenty nanometre synaptic gap, electricity becomes chemistry.',p:[59,-56,8],l:[62,-60,0],f:110,pulse:3,y:-60},
+{t:'This is you',x:'86 billion neurons. 100 trillion synapses. Running on the power of a dim light bulb. Every thought is a storm of light and chemistry.',n:'Eighty six billion neurons. One hundred trillion synapses. Running on the power of a dim light bulb. This is you.',p:[0,6,36],l:[0,0,0],f:55,lobes:2}];
+let ch=-1,play=true,T=0,chT=0,lobe=-1,lobeT=0,pi=0;const look=new THREE.Vector3(0,0,0),tp=new THREE.Vector3(),tl=new THREE.Vector3();
+$('dots').innerHTML=CH.map((_,i)=>`<i data-i="${i}"></i>`).join('');
+function go(i){ch=(i+CH.length)%CH.length;chT=0;const c=CH[ch];$('ct').textContent=c.t;$('cx').textContent=c.x;$('cs').textContent=c.s||'';[...$('dots').children].forEach((d,k)=>d.classList.toggle('a',k==ch));setF(c.f);lobe=-1;cols(-1);say(c.n)}
+$('dots').onclick=e=>{if(e.target.dataset.i!=null)go(+e.target.dataset.i)};$('nx').onclick=()=>go(ch+1);$('pv').onclick=()=>go(ch-1);
+$('pp').onclick=()=>{play=!play;$('pp').textContent=play?'❚❚':'▶'};
+const clock=new THREE.Clock();
+function frame(){requestAnimationFrame(frame);const dt=Math.min(clock.getDelta(),.05);T+=dt;chT+=dt;const c=CH[Math.max(ch,0)];
+ if(play&&ch>=0&&chT>13)go(ch+1);
+ tp.set(c.p[0]+Math.sin(T*.25)*3,c.p[1]+Math.cos(T*.2)*1.2,c.p[2]);tl.set(...c.l);const k=1-Math.exp(-dt*1.6);cam.position.lerp(tp,k);look.lerp(tl,k*1.2);cam.lookAt(look);
+ B.rotation.y+=dt*.1;
+ const op=c.op==null?.95:c.op;bm.opacity+=(op-bm.opacity)*.05;cm.opacity+=((c.chem?1:0)-cm.opacity)*.05;
+ IN.scale.setScalar(Math.max(.001,IN.scale.x+((ch==2?1:0)-IN.scale.x)*.06));amy.forEach(a=>a.scale.setScalar(1+.18*Math.sin(T*5)));
+ if(c.lobes){lobeT+=dt;const iv=c.lobes==1?2.6:.7;if(lobeT>iv){lobeT=0;lobe=c.lobes==1?(lobe+1)%4:Math.floor(Math.random()*4);cols(lobe);if(c.lobes==1)$('cs').textContent=LN[lobe];blip(300+lobe*120,.08,.4)}}
+ for(let i=0;i<CN;i++){const j=i*3,v=cv[i];cp[j]+=v.x*dt;cp[j+1]+=v.y*dt;cp[j+2]+=v.z*dt;if((cp[j]/9)**2+(cp[j+1]/7)**2+(cp[j+2]/12)**2>.8)v.multiplyScalar(-1)}cg.attributes.position.needsUpdate=true;
+ // pulse
+ pulse.visible=!!c.pulse;vm.opacity+=((c.pulse>=1?1:0)-vm.opacity)*.05;
+ if(c.pulse==1){const x=3+((T*14)%(END-3));pulse.position.x=x;if(x<4)blip(700,.1)}
+ if(c.pulse==2){const f=T*2.4,i=Math.floor(f)%7,fr=Math.min((f%1)*3,1),a=nodes[i],b=nodes[i+1];pulse.position.x=a+(b-a)*fr;if(i!=pi){pi=i;blip(500+i*60,.06,.08)}}
+ if(c.pulse==3){pulse.position.x=END;pulse.scale.setScalar(1+.4*Math.sin(T*8));if(Math.floor(T*1.2)!=pi){pi=Math.floor(T*1.2);blip(1000,.1,.2)}}
+ for(let i=0;i<VN;i++){const q=vph[i];q[0]=(q[0]+dt*.35)%1;vp.set([END+1+q[0]*5.2,q[1]*q[0]*2.2,q[2]*q[0]*2.2],i*3)}vg.attributes.position.needsUpdate=true;
+ soma.scale.setScalar(1+.05*Math.sin(T*3));R.render(S,cam)}
+frame();
+
+/* ---------- UI ---------- */
+$('go').onclick=()=>{$('start').style.display='none';audio();go(0)};
+$('bS').onclick=()=>{snd=!snd;$('bS').textContent='Sound: '+(snd?'on':'off');if(mg)mg.gain.value=snd?.1:0;if(!snd)try{speechSynthesis.cancel()}catch(e){}else say(CH[ch].n)};
+let stop=()=>{};
+$('bG').onclick=()=>{$('g').classList.add('show');$('bG').classList.add('on');$('bC').classList.remove('on');$('cap').style.display='none';if(!$('ga').innerHTML)run('quiz')};
+$('bC').onclick=()=>{stop();$('g').classList.remove('show');$('bC').classList.add('on');$('bG').classList.remove('on');$('cap').style.display=''};
+$('bk').onclick=()=>$('bC').onclick();document.querySelector('.tabs').onclick=e=>{if(e.target.dataset.g)run(e.target.dataset.g)};
+function run(n){stop();stop=()=>{};[...document.querySelectorAll('.tabs button')].forEach(b=>b.classList.toggle('on',b.dataset.g==n));({quiz,relay,catcher:catchG,catch:catchG,mem})[n]()}
+
+/* Game 1: Lobe Blitz */
+const Q=[['Which lobe is your brain’s visual centre?','Occipital','Frontal','Parietal','Temporal'],['Which lobe plans and makes decisions?','Frontal','Occipital','Temporal','Parietal'],['Which structure builds your memories?','Hippocampus','Amygdala','Myelin','Synapse'],['Which structure feels fear?','Amygdala','Hippocampus','Occipital lobe','Axon'],['How fast can signals race along myelinated axons?','100 m/s','1 m/s','10 km/s','The speed of light'],['How wide is the synaptic gap?','20 nanometres','20 millimetres','2 micrometres','20 centimetres'],['How many neurons are in a human brain?','86 billion','86 million','860 billion','8.6 billion'],['Roughly how many synapses are there?','100 trillion','100 million','1 billion','10 trillion'],['Your brain runs on about as much power as…','A dim light bulb','A microwave','A hair dryer','A kettle'],['Which lobe handles touch and spatial sense?','Parietal','Occipital','Frontal','Temporal'],['At the synapse, electricity becomes…','Chemistry','Light','Sound','Heat'],['Which messenger rises during stress?','Cortisol','Melatonin','Oxytocin','Endorphin'],['Which messenger helps regulate sleep?','Melatonin','Cortisol','Dopamine','Oxytocin'],['Which messenger is linked to bonding and trust?','Oxytocin','Cortisol','Melatonin','GABA'],['Which messenger is the body’s natural painkiller?','Endorphin','Cortisol','Melatonin','Glutamate']];
+function quiz(){const qs=shuf(Q).slice(0,8);let i=0,sc=0,t0,iv;const A=$('ga');
+ function show(){if(i>=qs.length){clearInterval(iv);A.innerHTML=`<h3>Score: ${sc}</h3><p class="hint">${sc>130?'Neuroscientist level!':sc>80?'Great synapses!':'Keep firing, try again.'}</p><button id="rq">Play again</button>`;$('rq').onclick=quiz;return}
+  const q=qs[i];A.innerHTML=`<div class="hud"><span>Question ${i+1}/8</span><span>Score ${sc}</span></div><div class="bar"><i id="tb" style="width:100%"></i></div><h3 style="margin-top:14px">${q[0]}</h3>`+shuf(q.slice(1)).map(o=>`<button class="opt">${o}</button>`).join('');
+  t0=performance.now();clearInterval(iv);iv=setInterval(()=>{const f=Math.max(0,1-(performance.now()-t0)/10000);$('tb').style.width=f*100+'%';if(f<=0){clearInterval(iv);pick(null)}},50);
+  A.querySelectorAll('.opt').forEach(b=>b.onclick=()=>pick(b))}
+ function pick(b){clearInterval(iv);const q=qs[i],f=Math.max(0,1-(performance.now()-t0)/10000);A.querySelectorAll('.opt').forEach(o=>{o.disabled=true;if(o.textContent==q[1])o.classList.add('ok')});if(b&&b.textContent==q[1]){sc+=10+Math.round(f*10);blip(900)}else{if(b)b.classList.add('no');blip(180)}i++;setTimeout(show,1100)}
+ stop=()=>clearInterval(iv);show()}
+
+/* Game 2: Signal Relay */
+function relay(){const A=$('ga');A.innerHTML=`<div class="hud"><span id="s1"></span><span id="l1"></span></div><canvas id="gc" width="640" height="300"></canvas><p class="hint">Tap the screen or press Space when the pulse is inside the green synapse zone. Each hit makes the neuron fire faster. Firing too early or letting it pass drains your myelin.</p>`;
+ const cv=$('gc'),g=cv.getContext('2d');let x=0,sp=150,sc=0,lv=3,over=false,msg='Ready…',fl=0,raf,last=performance.now();const Z0=500,Z1=590;
+ function fire(){if(over){x=0;sp=150;sc=0;lv=3;over=false;msg='Go!';return}if(x>=Z0&&x<=Z1){sc++;sp+=16;msg='Fired! Neurotransmitters released';blip(900)}else{lv--;msg='Misfire! Myelin damaged';blip(170)}fl=.25;x=0;if(lv<=0){over=true;msg='Game over. Tap to restart'}}
+ const kd=e=>{if(e.code=='Space'){e.preventDefault();fire()}};addEventListener('keydown',kd);cv.onpointerdown=fire;
+ function lp(now){raf=requestAnimationFrame(lp);const dt=(now-last)/1000;last=now;if(!over){x+=sp*dt;if(x>Z1+20){lv--;msg='Missed the gap!';blip(170);x=0;if(lv<=0){over=true;msg='Game over. Tap to restart'}}}fl=Math.max(0,fl-dt);
+  g.clearRect(0,0,640,300);g.fillStyle='rgba(42,230,140,.25)';g.fillRect(Z0,90,Z1-Z0,120);g.fillStyle='#fff7';g.font='13px system-ui';g.fillText('SYNAPSE',Z0+14,82);
+  g.fillStyle='#ffe58a';g.fillRect(20,146,600,8);for(let i=0;i<7;i++){g.fillStyle='#ff9ec7';g.beginPath();g.roundRect(45+i*68,132,52,36,14);g.fill()}
+  g.fillStyle='#5a9bff';g.beginPath();g.arc(20,150,28,0,7);g.fill();const gr=g.createRadialGradient(x+20,150,0,x+20,150,30);gr.addColorStop(0,'#fff');gr.addColorStop(1,'#7cf5ff00');g.fillStyle=gr;g.beginPath();g.arc(x+20,150,30,0,7);g.fill();
+  if(fl>0){g.fillStyle=`rgba(255,255,255,${fl})`;g.fillRect(0,0,640,300)}g.fillStyle='#e8ecff';g.font='16px system-ui';g.fillText(msg,20,280);$('s1').textContent='Fired: '+sc;$('l1').textContent='Myelin: '+'♥'.repeat(Math.max(lv,0))}
+ raf=requestAnimationFrame(lp);stop=()=>{cancelAnimationFrame(raf);removeEventListener('keydown',kd)}}
+
+/* Game 3: Synapse Catcher */
+function catchG(){const A=$('ga');A.innerHTML=`<div class="hud"><span id="s2"></span><span id="l2"></span></div><canvas id="gc" width="640" height="400"></canvas><p class="hint">Move your mouse or finger (or use ← →) to slide the receptor. Catch ONLY the target neurotransmitter shown at the top. Wrong catches cost a life.</p>`;
+ const cv=$('gc'),g=cv.getContext('2d'),T3=[['Dopamine','#ffd23a'],['Serotonin','#4de4ff'],['Glutamate','#b07bff'],['GABA','#7dff7d'],['Cortisol','#ff3c3c'],['Oxytocin','#ff6bd6'],['Melatonin','#5b7cff'],['Endorphin','#ff9a3c']];
+ let px=320,sc=0,lv=3,tg=0,tt=0,sp=0,items=[],over=false,raf,last=performance.now(),dir=0;
+ cv.onpointermove=e=>{const r=cv.getBoundingClientRect();px=(e.clientX-r.left)/r.width*640};
+ const kd=e=>{if(e.key=='ArrowLeft')dir=-1;if(e.key=='ArrowRight')dir=1},ku=()=>dir=0;addEventListener('keydown',kd);addEventListener('keyup',ku);
+ cv.onclick=()=>{if(over){sc=0;lv=3;over=false;items=[]}};
+ function lp(now){raf=requestAnimationFrame(lp);const dt=Math.min((now-last)/1000,.05);last=now;g.clearRect(0,0,640,400);
+  if(!over){px=Math.max(45,Math.min(595,px+dir*380*dt));tt+=dt;if(tt>10){tt=0;tg=(tg+1+Math.floor(Math.random()*7))%8;blip(600,.1)}sp+=dt;if(sp>Math.max(.35,.8-sc*.01)){sp=0;items.push({x:rnd(30,610),y:-10,t:Math.random()<.4?tg:Math.floor(rnd(0,8)),v:rnd(110,170)+sc*2})}
+   items.forEach(o=>{o.y+=o.v*dt;if(o.y>360&&o.y<385&&Math.abs(o.x-px)<48&&!o.d){o.d=1;if(o.t==tg){sc+=10;blip(950)}else{lv--;blip(160);if(lv<=0)over=true}}});items=items.filter(o=>o.y<420&&!o.d)}
+  g.fillStyle='#ffd27a44';g.fillRect(0,0,640,16);items.forEach(o=>{g.fillStyle=T3[o.t][1];g.shadowColor=T3[o.t][1];g.shadowBlur=14;g.beginPath();g.arc(o.x,o.y,10,0,7);g.fill()});g.shadowBlur=0;
+  g.fillStyle='#2ac9b5';g.beginPath();g.roundRect(px-48,370,96,16,8);g.fill();g.fillStyle='#ff6bd6';for(let i=-2;i<=2;i++){g.beginPath();g.arc(px+i*20,370,5,0,7);g.fill()}
+  g.fillStyle=T3[tg][1];g.font='bold 18px system-ui';g.fillText('Catch: '+T3[tg][0],220,44);if(over){g.fillStyle='#fff';g.fillText('Game over. Click to restart',200,200)}
+  $('s2').textContent='Score: '+sc;$('l2').textContent='Lives: '+'♥'.repeat(Math.max(lv,0))}
+ raf=requestAnimationFrame(lp);stop=()=>{cancelAnimationFrame(raf);removeEventListener('keydown',kd);removeEventListener('keyup',ku)}}
+
+/* Game 4: Memory Match (hippocampus training) */
+function mem(){const pr=[['Frontal','Plans'],['Parietal','Senses'],['Occipital','Sees'],['Temporal','Hears'],['Hippocampus','Memory'],['Amygdala','Fear'],['Myelin','100 m/s'],['Synapse','20 nm']];
+ const cs=shuf(pr.flatMap((p,i)=>[{k:i,s:p[0]},{k:i,s:p[1]}])),A=$('ga');let sel=[],mv=0,done=0,lock=false;
+ A.innerHTML=`<div class="hud"><span>Train your hippocampus: match each part with its job</span><span id="mv">Moves: 0</span></div><div class="grid">`+cs.map((c,i)=>`<button class="card" data-i="${i}">?</button>`).join('')+`</div>`;
+ A.querySelector('.grid').onclick=e=>{const b=e.target.closest('.card');if(!b||lock||b.classList.contains('m')||sel.includes(b))return;b.textContent=cs[b.dataset.i].s;sel.push(b);blip(500,.08,.1);if(sel.length==2){mv++;$('mv').textContent='Moves: '+mv;const[a,c]=sel;if(cs[a.dataset.i].k==cs[c.dataset.i].k){a.classList.add('m');c.classList.add('m');sel=[];blip(950);if(++done==8)A.insertAdjacentHTML('beforeend',`<h3 style="margin-top:14px">Memory complete in ${mv} moves!</h3>`)}else{lock=true;setTimeout(()=>{sel.forEach(x=>x.textContent='?');sel=[];lock=false},800)}}}}
+</script></body></html>
